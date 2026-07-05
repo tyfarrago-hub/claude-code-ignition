@@ -1,6 +1,8 @@
-# Claude Code Setup Guide
+# Claude Code Ignition
 
 A complete one-paste setup for Claude Code with persistent memory, session continuity, and beginner-friendly defaults. Works on **Mac** and **Windows**.
+
+Ignition is the first message you send Claude Code: one paste sets up memory, rules, and hooks. After setup, level up with [compound](https://github.com/tyfarrago-hub/compound) (7 workflow skills for daily use), [taste](https://github.com/tyfarrago-hub/taste) (frontend design skills), and [soul](https://github.com/tyfarrago-hub/soul) (agent personality template).
 
 ---
 
@@ -309,7 +311,7 @@ Use my name, role, and project from the top of this guide to fill in the User Pr
 ### Phase 8: Write `~/.claude/settings.json` (hooks + permissions)
 
 This is the automation layer. Two hooks fire automatically:
-- **Stop hook:** when Claude finishes a response, it plays a sound and reminds Claude to update `primer.md` and `MEMORY.md`.
+- **Stop hook:** when Claude tries to end its turn, it plays a sound and sends Claude a blocking reminder to update `primer.md` and `MEMORY.md`. Claude reads the reminder, writes the updates, then stops for real. The script checks `stop_hook_active` in the hook input and lets that second stop through, so it never loops.
 - **Notification hook:** when Claude needs my input, it plays a sound and shows a popup so I notice.
 
 #### Mac version
@@ -329,7 +331,7 @@ This is the automation layer. Two hooks fire automatically:
           },
           {
             "type": "command",
-            "command": "echo 'SESSION ENDING: 1) Rewrite ~/.claude/primer.md with active project, what was just completed, exact next step, and open blockers (under 100 lines). 2) Update MEMORY.md with any new facts learned this session.'",
+            "command": "python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({\"decision\": \"block\", \"reason\": \"Before ending: if meaningful work happened this session, update primer.md and MEMORY.md, then stop again.\"})) if not d.get(\"stop_hook_active\") else None'",
             "statusMessage": "Reminding Claude to update primer + memory..."
           }
         ]
@@ -366,7 +368,7 @@ This is the automation layer. Two hooks fire automatically:
           },
           {
             "type": "command",
-            "command": "echo SESSION ENDING: 1) Rewrite primer.md with active project, what was just completed, exact next step, and open blockers (under 100 lines). 2) Update MEMORY.md with any new facts learned this session.",
+            "command": "powershell -c \"$d=[Console]::In.ReadToEnd()|ConvertFrom-Json; if(-not $d.stop_hook_active){@{decision='block';reason='Before ending: if meaningful work happened this session, update primer.md and MEMORY.md, then stop again.'}|ConvertTo-Json -Compress}\"",
             "statusMessage": "Reminding Claude to update primer + memory..."
           }
         ]
@@ -385,6 +387,10 @@ This is the automation layer. Two hooks fire automatically:
   }
 }
 ```
+
+#### How the Stop hook works
+
+A plain `echo` in a Stop hook only prints to the transcript. Claude never sees it. To actually reach Claude, the hook prints JSON with `"decision": "block"` and a `reason`. Claude Code hands that reason to Claude, Claude updates the memory files, then tries to stop again. On that second stop the hook's input has `"stop_hook_active": true`, so the script prints nothing and exits 0, and the session ends cleanly. That guard is what keeps it from looping forever.
 
 #### About permission mode
 
@@ -473,6 +479,9 @@ Once everything is verified:
 **Windows Defender blocking Node:**
 - Add the Node install folder to exclusions: Settings > Virus & Threat Protection > Manage Settings > Add Exclusion > Folder.
 
+**Claude takes one extra turn when a session ends:**
+- That's the Stop hook working as designed. It blocks the first stop so Claude updates `primer.md` and `MEMORY.md`, then the `stop_hook_active` guard lets the next stop through. If Claude keeps stopping and restarting forever, the guard check got mangled: re-copy the Stop hook command from Phase 8 exactly.
+
 **settings.json hooks not firing:**
 - The JSON is probably malformed. Validate it:
   - Mac: `python3 -m json.tool < ~/.claude/settings.json` (or `node -e "JSON.parse(require('fs').readFileSync('$HOME/.claude/settings.json'))"`)
@@ -523,7 +532,7 @@ On Mac your `.claude` folder lives at `~/.claude/`. On Windows it lives at `C:\U
 
 1. **Session starts** → Claude reads `CLAUDE.md` → imports `primer.md` + `MEMORY.md`.
 2. **During session** → Claude creates and updates individual memory files as it learns about you.
-3. **Session ends** → Stop hook fires → Claude rewrites `primer.md` and updates `MEMORY.md`.
+3. **Session ends** → Stop hook blocks the first stop and hands Claude the reminder → Claude rewrites `primer.md` and updates `MEMORY.md` → the `stop_hook_active` guard lets the next stop through.
 4. **Next session** → back to step 1, full context carried forward.
 
 ### Memory types Claude builds over time
@@ -544,19 +553,18 @@ On Mac your `.claude` folder lives at `~/.claude/`. On Windows it lives at `C:\U
 
 ### Custom skills
 
-Skills are reusable prompt templates you call with `/`. Just ask Claude: *"Create a skill called my-skill that does X."* Claude will create the folder and file for you. Or do it manually:
+Skills are reusable instruction files Claude loads when a task matches their description. Just ask Claude: *"Create a skill called my-skill that does X."* Claude will create the folder and file for you. Or do it manually. Two rules: the file must be named `SKILL.md` inside the skill's folder (any other filename won't register), and the `description` should be written as trigger text ("Use when...") so Claude knows when to load it.
 
 **Mac:**
 ```
 mkdir -p ~/.claude/skills/my-skill
-cat > ~/.claude/skills/my-skill/my-skill.md << 'EOF'
+cat > ~/.claude/skills/my-skill/SKILL.md << 'EOF'
 ---
 name: my-skill
-description: What this skill does
-user_invocable: true
+description: Use when I ask for X, mention Y, or need help doing Z.
 ---
 
-(Your prompt template here. Claude follows these instructions when you type /my-skill in chat.)
+(Your prompt template here. Claude follows these instructions when the skill triggers or when you type /my-skill in chat.)
 EOF
 ```
 
@@ -566,12 +574,11 @@ New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.claude\skills\my-sk
 @"
 ---
 name: my-skill
-description: What this skill does
-user_invocable: true
+description: Use when I ask for X, mention Y, or need help doing Z.
 ---
 
-(Your prompt template here. Claude follows these instructions when you type /my-skill in chat.)
-"@ | Set-Content "$env:USERPROFILE\.claude\skills\my-skill\my-skill.md"
+(Your prompt template here. Claude follows these instructions when the skill triggers or when you type /my-skill in chat.)
+"@ | Set-Content "$env:USERPROFILE\.claude\skills\my-skill\SKILL.md"
 ```
 
 ### Custom slash commands
