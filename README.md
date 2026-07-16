@@ -219,16 +219,28 @@ Then below the imports, append the rules block (the same on both OSes):
 
 ## PREFERENCES
 
-1. **Plain English recap on complex answers.** After any technical or multi-step answer, append a section titled `**In plain English:**` that re-states the same answer without the jargon. The point is translation, not simplification. Assume the reader is intelligent but new to the technical layer. Strip the jargon, keep the substance. Trigger this for: code, commands, errors, multi-step plans, anything with unfamiliar terms. Skip it for yes/no answers and casual chat.
+1. **Plain English recap on complex answers.** After any technical or multi-step answer, append a section titled `**In plain English:**` that restates the same answer without the big words. The point is translation. Assume the reader is intelligent but new to the technical layer. Keep the substance, drop the insider vocabulary. Trigger this for: code, commands, errors, multi-step plans, anything with unfamiliar terms. Skip it for yes/no answers and casual chat.
 2. **One clear next action per response.** Not a list of options. If I genuinely need to choose, ask me ONE question.
 3. **Flag uncertainty with `[UNCLEAR]`.** Don't guess. If you don't know whether a path, command, or value is correct, mark it.
-4. **Short, direct responses.** No "Great question!", no "Sure thing!", no preamble. Don't OPEN by recapping my question — get straight to the answer. (A short, labeled recap at the END of the response is good — see rule 9.)
+4. **Short, direct responses.** No "Great question!", no "Sure thing!", no preamble. Don't OPEN by recapping my question. Get straight to the answer.
 5. **Diagnose before fixing.** When something breaks, explain what you think is wrong and why BEFORE you change anything.
-6. **Verify before claiming done.** Run the check, read the output, then tell me it works. "This should work" is not allowed.
-7. **No half-features.** If a step fails, fix it before moving on. Don't skip and circle back later.
-8. **Ask when genuinely blocked.** Rules 4 and 7 mean "no fluff" and "don't skip," not "stay silent forever." If you've exhausted reasonable diagnostic options and need information only I have (a credential, a decision, an external state), surface the blocker in one tight sentence and ask.
-9. **End-of-response recap of what I asked.** At the end of every substantive response, add one short plain-English line that restates what I asked you to do, labeled with an emoji so it's easy to spot at a glance (for example: `📋 What you asked:`). Put it at the END, not the start — so when a thread gets long I can see what it was about without scrolling back to the top. Skip it for quick back-and-forth where the ask is obvious.
-10. **Close with a simple analogy.** End every substantive response with a `🔑 Simple analogy:` line (or `🔑 Tiny version:`) that explains the core idea in third-grade language — a plain, friendly comparison that makes it click. This is the last thing in the response, just below the recap from rule 9. Skip only for trivial chat.
+6. **No half-features.** If a step fails, fix it before moving on. Don't skip and circle back later.
+7. **Ask when genuinely blocked.** "No fluff" and "don't skip" don't mean "stay silent forever." If you've exhausted reasonable diagnostic options and need information only I have (a credential, a decision, an external state), surface the blocker in one tight sentence and ask.
+8. **RESPONSE BOOKEND (fires on every substantive response).** End the response with a horizontal rule (`---`) followed by exactly two items:
+   - A status, exactly one of: `✅ **DONE**` / `🟨 **PARTIAL**` / `🟥 **BLOCKED**`. Only one ever shows. Red means it genuinely did not fully land. Never sugarcoat the status.
+   - `▪ **SIMPLE ANALOGY**` with the core idea explained in third-grade language, 1 to 2 lines. A plain, friendly comparison that makes it click.
+   Skip the bookend only for trivial back-and-forth where the ask is self-evident.
+
+## GUARDRAILS (hard rules — these prevent the most common failure loops)
+
+- **Verify before claiming done.** Never say "fixed", "done", "live", or "working" unless you reproduced my exact action this turn and saw evidence: command output, a test result, a screenshot, an HTTP status. "The code is in place" and "the outcome is proven" are two different claims. Always say which one you have.
+- **Two-strike rule.** After 2 failed fixes of the same symptom, stop patching. Re-diagnose from scratch, explain the root cause with evidence, and only then touch code again. A third attempt at the same theory is banned.
+- **Stale file guard.** If an edit fails with "string not found," the file changed since you last read it. Re-read it, then edit. Never retry blind.
+- **Scope gate.** An idea I mention in passing is input. Anything over ~30 minutes of building gets one confirming line first ("Building X, scoped to Y. Starting.") so I can redirect before you invest the hour.
+- **Constraints stick.** When I correct course or restrict scope mid-task ("just X, nothing else", "keep it simple", "skip that part"), that constraint stays binding for the rest of the session. Re-check it before every deliverable.
+- **Keep it simple.** Minimum code that solves the problem. No extra features I didn't ask for, no speculative flexibility, no abstractions for single-use code.
+- **Surgical changes.** Touch only what the task needs. Don't reformat, refactor, or "improve" nearby code that wasn't part of the ask.
+- **State assumptions.** If my request could mean two different things, say which interpretation you picked, or ask me ONE question before starting.
 
 ## AGENT RULES
 
@@ -236,6 +248,16 @@ Then below the imports, append the rules block (the same on both OSes):
 - At the end of every session, rewrite `primer.md` completely with: active project, what was just completed, exact next step, open blockers. Keep it under 100 lines.
 - Save anything long (drafts, proposals, plans, code) to a file the moment it exists. Don't let it live only in chat.
 - Never ask me for context that's already in `primer.md`, `MEMORY.md`, or any imported file. Read first.
+- Before saying "I don't know" about past work, search the memory folder and past session transcripts under `~/.claude/projects/` first.
+
+## MEMORY RULES
+
+- One memory = one file in the memory folder, named `<type>_<slug>.md` where type is `user`, `feedback`, `project`, or `reference`.
+- Every memory file starts with frontmatter (`name`, `description`, `type`), then the fact itself. For `feedback` memories, also write a `**Why:**` line and a `**How to apply:**` line so future sessions apply the lesson instead of just knowing it.
+- After writing a memory file, add ONE line to `MEMORY.md` pointing at it: `- [Short title](filename.md) — one-line hook`. `MEMORY.md` is an index. The detail lives in the individual files.
+- Before saving a new memory, check whether an existing file already covers it. Update that file instead of creating a near-duplicate. Delete memories that turn out to be wrong.
+- When I say "remember that," save it immediately. Don't wait for the end of the session.
+- When I correct you, that is a `feedback` memory. Save the correction AND the reason, so the mistake never repeats.
 ```
 
 After writing, verify the file exists, the imports use absolute paths (no `~`), and the username segments are filled in correctly:
@@ -273,46 +295,68 @@ This file gets rewritten at the end of every session so the next session picks u
 
 ---
 
-### Phase 7: Write `MEMORY.md` (long-term memory index)
+### Phase 7: Write the memory system (`MEMORY.md` index + first memory files)
 
-**File path** (the same memory folder you created in Phase 4 — use the **SAFE_USER** value from Phase 4, not RAW_USER):
-- Mac: `~/.claude/projects/-Users-<SAFE_USER>/memory/MEMORY.md`
-- Windows: `$env:USERPROFILE\.claude\projects\-Users-<SAFE_USER>\memory\MEMORY.md`
+Memory is a folder of small files plus one index. Each durable fact lives in its own file. `MEMORY.md` holds one line per file and gets loaded into every session, so the index stays small while the memory itself can grow forever. This split is the single biggest upgrade over a flat notes file: the always-loaded part stays cheap, and the detail is there when it's relevant.
 
-Use my name, role, and project from the top of this guide to fill in the User Profile section. Detect my OS, shell, and architecture and fill those in too.
+**Folder** (created in Phase 4, use the **SAFE_USER** value, not RAW_USER):
+- Mac: `~/.claude/projects/-Users-<SAFE_USER>/memory/`
+- Windows: `$env:USERPROFILE\.claude\projects\-Users-<SAFE_USER>\memory\`
+
+**Memory file format.** Every memory file follows this shape:
+
+```
+---
+name: short-kebab-slug
+description: one-line summary, used to decide whether this memory is relevant
+metadata:
+  type: user | feedback | project | reference
+---
+
+The fact itself, in a few lines.
+
+(For feedback memories, also include:)
+**Why:** the reason this matters.
+**How to apply:** what to do differently next time.
+```
+
+The four types:
+- **user** — who I am: role, expertise, preferences.
+- **feedback** — corrections and confirmed approaches, with the why attached.
+- **project** — ongoing work, goals, decisions, constraints.
+- **reference** — pointers to external things: URLs, dashboards, tools, file locations.
+
+**Now create the first two memory files** in that folder, using my name, role, and project from the top of this guide, plus the OS/architecture/shell you detected:
+
+1. `user_profile.md` — type `user`. Body: my name, role, what I'm currently working on, and communication style (default: short, direct, autonomous; refine during onboarding).
+2. `reference_system.md` — type `reference`. Body: OS + version, architecture (Apple Silicon / Intel / x64), shell, full path of the memory folder, and the settings.json path.
+
+**Then write `MEMORY.md`** in the same folder, as an index with one line per memory:
 
 ```
 # MEMORY.md
 
 ## User Profile
-- Name: (use what I gave you at the top)
-- Role: (use what I gave you)
-- Currently working on: (use what I gave you)
-- Communication style: (will refine during onboarding — default: short, direct, autonomous)
+- [Who I am](user_profile.md) — name, role, current focus
 
 ## System
-- OS: (detect — macOS / Windows / Linux + version)
-- Architecture: (Apple Silicon / Intel Mac / x64 Windows / arm64 Windows)
-- Shell: (zsh / PowerShell / bash)
-
-## Key File Locations
-- Memory folder: (full path you just created)
-- Settings: ~/.claude/settings.json (or Windows equivalent)
-
-## Projects
-- (Claude fills this in as we work)
+- [This machine](reference_system.md) — OS, architecture, shell, key paths
 
 ## Preferences (learned over time)
-- (Claude adds entries here when I correct or confirm something)
+- (one line added here per feedback memory)
+
+## Projects
+- (one line added here per project memory)
 ```
+
+Verify: both memory files and `MEMORY.md` exist in the folder, and every line in `MEMORY.md` points at a file that exists.
 
 ---
 
 ### Phase 8: Write `~/.claude/settings.json` (hooks + permissions)
 
-This is the automation layer. Two hooks fire automatically:
-- **Stop hook:** when Claude tries to end its turn, it plays a sound and sends Claude a blocking reminder to update `primer.md` and `MEMORY.md`. Claude reads the reminder, writes the updates, then stops for real. The script checks `stop_hook_active` in the hook input and lets that second stop through, so it never loops.
-- **Notification hook:** when Claude needs my input, it plays a sound and shows a popup so I notice.
+This is the automation layer. One hook fires automatically:
+- **Stop hook:** when Claude tries to end its turn, it plays a soft glass chime (so you can look away while Claude works and still know when it's done) and sends Claude a blocking reminder to update `primer.md` and memory. Claude reads the reminder, writes the updates, then stops for real. The script checks `stop_hook_active` in the hook input and lets that second stop through, so it never loops.
 
 #### Mac version
 
@@ -331,18 +375,8 @@ This is the automation layer. Two hooks fire automatically:
           },
           {
             "type": "command",
-            "command": "python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({\"decision\": \"block\", \"reason\": \"Before ending: if meaningful work happened this session, update primer.md and MEMORY.md, then stop again.\"})) if not d.get(\"stop_hook_active\") else None'",
+            "command": "python3 -c 'import json,sys; d=json.load(sys.stdin); print(json.dumps({\"decision\": \"block\", \"reason\": \"Before ending: if meaningful work happened this session, rewrite primer.md, save new durable facts as memory files, index them in MEMORY.md, then stop again.\"})) if not d.get(\"stop_hook_active\") else None'",
             "statusMessage": "Reminding Claude to update primer + memory..."
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "osascript -e 'display notification \"Claude needs your input\" with title \"Claude Code\" sound name \"Funk\"'"
           }
         ]
       }
@@ -368,18 +402,8 @@ This is the automation layer. Two hooks fire automatically:
           },
           {
             "type": "command",
-            "command": "powershell -c \"$d=[Console]::In.ReadToEnd()|ConvertFrom-Json; if(-not $d.stop_hook_active){@{decision='block';reason='Before ending: if meaningful work happened this session, update primer.md and MEMORY.md, then stop again.'}|ConvertTo-Json -Compress}\"",
+            "command": "powershell -c \"$d=[Console]::In.ReadToEnd()|ConvertFrom-Json; if(-not $d.stop_hook_active){@{decision='block';reason='Before ending: if meaningful work happened this session, rewrite primer.md, save new durable facts as memory files, index them in MEMORY.md, then stop again.'}|ConvertTo-Json -Compress}\"",
             "statusMessage": "Reminding Claude to update primer + memory..."
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "powershell -c \"[System.Media.SystemSounds]::Exclamation.Play(); Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; $n.Icon = [System.Drawing.SystemIcons]::Information; $n.BalloonTipTitle = 'Claude Code'; $n.BalloonTipText = 'Claude needs your input'; $n.Visible = $true; $n.ShowBalloonTip(5000); Start-Sleep -Seconds 6; $n.Dispose()\""
           }
         ]
       }
@@ -431,7 +455,7 @@ Once everything is verified:
    - What tools or platforms do you use most? (so I can suggest integrations later)
    - How often will you use Claude Code? (daily / weekly / for specific projects)
    - What's the biggest thing you hope this unlocks for you?
-3. Update `MEMORY.md` with my answers.
+3. Save each answer that reveals something durable as a memory file (type `user` or `feedback`) and add its line to `MEMORY.md`.
 4. Rewrite `primer.md` with my current project state and a concrete next step.
 5. Suggest one specific thing I can ask you next to test the setup.
 
@@ -530,17 +554,19 @@ On Mac your `.claude` folder lives at `~/.claude/`. On Windows it lives at `C:\U
 
 ### The session loop
 
-1. **Session starts** → Claude reads `CLAUDE.md` → imports `primer.md` + `MEMORY.md`.
-2. **During session** → Claude creates and updates individual memory files as it learns about you.
-3. **Session ends** → Stop hook blocks the first stop and hands Claude the reminder → Claude rewrites `primer.md` and updates `MEMORY.md` → the `stop_hook_active` guard lets the next stop through.
+1. **Session starts** → Claude reads `CLAUDE.md` → imports `primer.md` + `MEMORY.md` (the index of everything it knows about you).
+2. **During session** → when Claude learns a durable fact, it writes a memory file and adds one line to the `MEMORY.md` index. When you correct it, that becomes a `feedback` memory with the why attached.
+3. **Session ends** → Stop hook blocks the first stop and hands Claude the reminder → Claude rewrites `primer.md` and indexes any new memories → the `stop_hook_active` guard lets the next stop through.
 4. **Next session** → back to step 1, full context carried forward.
 
 ### Memory types Claude builds over time
 
 - **user** — your role, expertise, preferences (helps Claude tailor its tone and approach).
-- **feedback** — corrections and confirmations (so Claude doesn't repeat mistakes or drift).
+- **feedback** — corrections and confirmations, each with a "Why" and "How to apply" (so Claude doesn't repeat mistakes or drift). These are the highest-value memories in the whole system.
 - **project** — ongoing work, deadlines, decisions (so Claude understands the WHY behind requests).
 - **reference** — pointers to external systems (Linear, Slack, dashboards, etc.).
+
+One fact per file, one line per file in the index. `MEMORY.md` never holds the full content, and individual files never go unindexed.
 
 ### What carries between sessions vs what doesn't
 
@@ -601,12 +627,40 @@ Invoke with `/hello`.
 
 ---
 
+## Leveling up (your first month)
+
+The setup above makes Claude Code useful on day one. These habits are what make it powerful. Take them roughly in order; each one builds on the last.
+
+### Week 1: build the memory habit
+
+Say **"remember that"** whenever Claude learns something worth keeping. Correct it when it does something you don't like, and tell it when it nails something so it saves the confirmed approach. Every correction becomes a `feedback` memory, and within a week Claude stops making the same mistake twice. This habit is 80% of what separates people who love Claude Code from people who feel like they're starting over every session.
+
+### Week 2: plan before big builds
+
+Press **Shift+Tab** to cycle into **Plan Mode** before anything bigger than a small edit. Claude researches your files and proposes a plan you approve BEFORE it touches anything. A bad plan costs one message to fix. A bad build costs an afternoon. Rule of thumb: if the task would take you more than 30 minutes by hand, plan it first.
+
+### Week 3: turn repeat work into skills
+
+The second time you ask for the same kind of thing (a weekly report, a code review checklist, formatted meeting notes, a content template), say: *"Create a skill called X that does this, based on what we just did."* From then on it's one slash command. And when a skill's output disappoints you, say *"update the skill so this doesn't happen again."* Skills that learn from every run are how your setup compounds.
+
+### Week 4: longer leashes
+
+- **Permission graduation.** You started with `"defaultMode": "default"` (Claude asks before running commands). Once you trust the workflow, move to `"acceptEdits"` (file edits auto-approved, commands still ask), and later `"bypassPermissions"` for maximum speed. Graduate one level at a time.
+- **Goals.** In the terminal version of Claude Code, `/goal` gives Claude a finish line and lets it keep working turn after turn until the finish line is verifiably true (for example: "every task in docs/roadmap.md is checked off and the app builds cleanly"). The skill is writing a condition a machine can check. Ask Claude: *"Help me structure a goal for this before I start."*
+- **Sub-agents.** For big independent chunks (research three options, audit every page, migrate many files), ask Claude to *"use sub-agents in parallel."* Each one gets its own fresh focus while your main conversation stays clean.
+
+### Anytime: let Claude improve its own setup
+
+Once a week, ask: *"Look at how we've been working. What's slowing us down, and what should we add to CLAUDE.md, memory, or skills to fix it?"* Your setup should be a living system that gets sharper the more you use it. Everything in this guide came from exactly that loop.
+
+---
+
 ## Tips for using this every day
 
 - **`primer.md` = short-term memory** (what's happening now, what's next).
-- **`MEMORY.md` = long-term memory** (who you are, how you work, key facts).
-- Keep `MEMORY.md` under 200 lines. It's loaded into every conversation.
-- Individual memory files can be longer — they're only read when relevant.
+- **`MEMORY.md` = long-term memory index** (one line per fact Claude knows about you).
+- Keep `MEMORY.md` under 200 lines. It's loaded into every conversation. The detail belongs in the individual memory files, which are only read when relevant.
 - Say **"remember that"** when you want Claude to explicitly save something.
-- If Claude forgets something between sessions, it's not in `primer.md` or `MEMORY.md`. Add it.
+- If Claude forgets something between sessions, it's missing from `primer.md` or the memory folder. Add it.
+- Full transcripts of past sessions live under `~/.claude/projects/`. If Claude claims it doesn't know something you've discussed before, tell it to search those transcripts before you re-explain.
 - The system gets smarter the more you use it. Memory grows. Trust it.
